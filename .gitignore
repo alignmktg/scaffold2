@@ -193,3 +193,6 @@ dmypy.json
 
 # Local development
 *.local
+
+# Documentation
+TEST_PLAN.md
