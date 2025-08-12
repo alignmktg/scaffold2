@@ -1,0 +1,38 @@
+name: Deploy
+
+on:
+    push:
+        branches: [main]
+
+jobs:
+    # Deploy to Railway (Backend)
+    deploy-backend:
+        runs-on: ubuntu-latest
+        if: github.ref == 'refs/heads/main'
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Deploy to Railway
+              run: |
+                  curl -X POST \
+                    -H "Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}" \
+                    -H "Content-Type: application/json" \
+                    -d '{"service": "api"}' \
+                    https://api.railway.app/v2/deployments
+
+    # Deploy to Vercel (Frontend)
+    deploy-frontend:
+        runs-on: ubuntu-latest
+        if: github.ref == 'refs/heads/main'
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Deploy to Vercel
+              uses: amondnet/vercel-action@v25
+              with:
+                  vercel-token: ${{ secrets.VERCEL_TOKEN }}
+                  vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+                  vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+                  working-directory: ./apps/web

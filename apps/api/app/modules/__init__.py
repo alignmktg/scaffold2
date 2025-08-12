@@ -1,0 +1,1 @@
+"""Optional AI modules package."""

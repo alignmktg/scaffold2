@@ -1,0 +1,64 @@
+# Build stage
+FROM node:18-alpine AS builder
+
+# Set work directory
+WORKDIR /app
+
+# Copy package files
+COPY package.json pnpm-lock.yaml ./
+COPY apps/web/package.json ./apps/web/
+COPY packages/shared/package.json ./packages/shared/
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source code
+COPY . .
+
+# Build shared package
+RUN pnpm --filter @ai-app/shared build
+
+# Build web app
+RUN pnpm --filter ai-app-web build
+
+# Production stage
+FROM node:18-alpine AS runner
+
+# Set work directory
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Copy package files
+COPY package.json pnpm-lock.yaml ./
+COPY apps/web/package.json ./apps/web/
+
+# Install production dependencies
+RUN pnpm install --prod --frozen-lockfile
+
+# Copy built application
+COPY --from=builder /app/apps/web/.next ./apps/web/.next
+COPY --from=builder /app/apps/web/public ./apps/web/public
+COPY --from=builder /app/apps/web/next.config.js ./apps/web/
+
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# Change ownership
+RUN chown -R nextjs:nodejs /app
+USER nextjs
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
+
+# Run the application
+CMD ["pnpm", "--filter", "ai-app-web", "start"]

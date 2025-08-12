@@ -1,0 +1,33 @@
+{
+	"name": "ai-app-bootstrap",
+	"version": "0.1.0",
+	"private": true,
+	"description": "AI App Bootstrap - FastAPI + Next.js monorepo with optional AI modules",
+	"scripts": {
+		"build": "turbo run build",
+		"dev": "turbo run dev",
+		"lint": "turbo run lint",
+		"typecheck": "turbo run typecheck",
+		"test": "turbo run test",
+		"clean": "turbo run clean",
+		"format": "turbo run format",
+		"docker:up": "docker-compose up -d",
+		"docker:down": "docker-compose down",
+		"docker:build": "docker-compose build",
+		"docker:logs": "docker-compose logs -f"
+	},
+	"devDependencies": {
+		"@turbo/gen": "^1.12.4",
+		"turbo": "^1.12.4",
+		"typescript": "^5.3.3"
+	},
+	"packageManager": "pnpm@8.15.4",
+	"engines": {
+		"node": ">=18.0.0",
+		"pnpm": ">=8.0.0"
+	},
+	"workspaces": [
+		"apps/*",
+		"packages/*"
+	]
+}

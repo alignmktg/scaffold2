@@ -1,0 +1,174 @@
+version: "3.8"
+
+services:
+    # PostgreSQL Database
+    postgres:
+        image: postgres:15-alpine
+        container_name: ai-app-postgres
+        environment:
+            POSTGRES_DB: ai_app
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: password
+        ports:
+            - "5432:5432"
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U postgres"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+
+    # Redis (for workers)
+    redis:
+        image: redis:7-alpine
+        container_name: ai-app-redis
+        ports:
+            - "6379:6379"
+        volumes:
+            - redis_data:/data
+        healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+        profiles:
+            - workers
+
+    # ChromaDB (for RAG)
+    chroma:
+        image: chromadb/chroma:latest
+        container_name: ai-app-chroma
+        environment:
+            - CHROMA_SERVER_HOST=0.0.0.0
+            - CHROMA_SERVER_HTTP_PORT=8000
+        ports:
+            - "8001:8000"
+        volumes:
+            - chroma_data:/chroma/chroma
+        healthcheck:
+            test:
+                ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+        profiles:
+            - rag
+
+    # Ollama (for local models)
+    ollama:
+        image: ollama/ollama:latest
+        container_name: ai-app-ollama
+        ports:
+            - "11434:11434"
+        volumes:
+            - ollama_data:/root/.ollama
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+        profiles:
+            - ollama
+
+    # FastAPI Backend
+    api:
+        build:
+            context: .
+            dockerfile: infra/docker/Dockerfile.api
+        container_name: ai-app-api
+        environment:
+            - DATABASE_URL=postgresql://postgres:password@postgres:5432/ai_app
+            - REDIS_HOST=redis
+            - REDIS_PORT=6379
+            - CHROMA_HOST=chroma
+            - CHROMA_PORT=8000
+            - OLLAMA_HOST=ollama
+            - OLLAMA_PORT=11434
+            - USE_WORKERS=${USE_WORKERS:-false}
+            - USE_RAG=${USE_RAG:-false}
+            - USE_OLLAMA=${USE_OLLAMA:-false}
+        ports:
+            - "8000:8000"
+        depends_on:
+            postgres:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+                required: false
+            chroma:
+                condition: service_healthy
+                required: false
+            ollama:
+                condition: service_healthy
+                required: false
+        volumes:
+            - ./apps/api:/app/app
+            - ./env.example:/app/.env.local
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+
+    # Next.js Frontend
+    web:
+        build:
+            context: .
+            dockerfile: infra/docker/Dockerfile.web
+        container_name: ai-app-web
+        environment:
+            - NEXT_PUBLIC_API_URL=http://localhost:8000
+            - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+            - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        ports:
+            - "3000:3000"
+        depends_on:
+            api:
+                condition: service_healthy
+        volumes:
+            - ./apps/web:/app/apps/web
+            - ./packages/shared:/app/packages/shared
+            - ./env.example:/app/.env.local
+
+    # Celery Worker (optional)
+    worker:
+        build:
+            context: .
+            dockerfile: infra/docker/Dockerfile.api
+        container_name: ai-app-worker
+        command:
+            [
+                "uv",
+                "run",
+                "celery",
+                "-A",
+                "app.modules.workers.celery_app",
+                "worker",
+                "--loglevel=info",
+            ]
+        environment:
+            - DATABASE_URL=postgresql://postgres:password@postgres:5432/ai_app
+            - CELERY_BROKER_URL=redis://redis:6379/0
+            - CELERY_RESULT_BACKEND=redis://redis:6379/0
+            - USE_WORKERS=true
+        depends_on:
+            postgres:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+        volumes:
+            - ./apps/api:/app/app
+            - ./env.example:/app/.env.local
+        profiles:
+            - workers
+
+volumes:
+    postgres_data:
+    redis_data:
+    chroma_data:
+    ollama_data:
+
+networks:
+    default:
+        name: ai-app-network
