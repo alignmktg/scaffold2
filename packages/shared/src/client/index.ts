@@ -12,6 +12,9 @@ import type {
 	OllamaModelInfo,
 } from "../types";
 
+// Define a simple headers type
+type ApiHeaders = Record<string, string>;
+
 export class ApiClient {
 	private baseUrl: string;
 	private token?: string;
@@ -29,9 +32,9 @@ export class ApiClient {
 		options: RequestInit = {}
 	): Promise<T> {
 		const url = `${this.baseUrl}${endpoint}`;
-		const headers: HeadersInit = {
+		const headers: ApiHeaders = {
 			"Content-Type": "application/json",
-			...options.headers,
+			...(options.headers as Record<string, string>),
 		};
 
 		if (this.token) {
@@ -47,10 +50,11 @@ export class ApiClient {
 			const error = await response
 				.json()
 				.catch(() => ({ detail: "Unknown error" }));
-			throw new Error(error.detail || `HTTP ${response.status}`);
+			const errorData = error as { detail?: string };
+			throw new Error(errorData.detail || `HTTP ${response.status}`);
 		}
 
-		return response.json();
+		return response.json() as Promise<T>;
 	}
 
 	// Health check
@@ -82,7 +86,7 @@ export class ApiClient {
 		request: ChatRequest
 	): AsyncGenerator<StreamChatResponse> {
 		const url = `${this.baseUrl}/ai/chat/stream`;
-		const headers: HeadersInit = {
+		const headers: ApiHeaders = {
 			"Content-Type": "application/json",
 		};
 
@@ -100,7 +104,8 @@ export class ApiClient {
 			const error = await response
 				.json()
 				.catch(() => ({ detail: "Unknown error" }));
-			throw new Error(error.detail || `HTTP ${response.status}`);
+			const errorData = error as { detail?: string };
+			throw new Error(errorData.detail || `HTTP ${response.status}`);
 		}
 
 		const reader = response.body?.getReader();
@@ -194,7 +199,7 @@ export class ApiClient {
 		request: ChatRequest
 	): AsyncGenerator<StreamChatResponse> {
 		const url = `${this.baseUrl}/ollama/chat/stream`;
-		const headers: HeadersInit = {
+		const headers: ApiHeaders = {
 			"Content-Type": "application/json",
 		};
 
@@ -212,7 +217,8 @@ export class ApiClient {
 			const error = await response
 				.json()
 				.catch(() => ({ detail: "Unknown error" }));
-			throw new Error(error.detail || `HTTP ${response.status}`);
+			const errorData = error as { detail?: string };
+			throw new Error(errorData.detail || `HTTP ${response.status}`);
 		}
 
 		const reader = response.body?.getReader();

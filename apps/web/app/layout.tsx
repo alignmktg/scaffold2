@@ -8,7 +8,6 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: process.env.NEXT_PUBLIC_APP_NAME || 'AI App Bootstrap',
   description: 'A modern AI application built with FastAPI and Next.js',
-  version: process.env.NEXT_PUBLIC_APP_VERSION || '0.1.0',
 }
 
 export default function RootLayout({

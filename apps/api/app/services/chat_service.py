@@ -103,9 +103,9 @@ class ChatService:
     async def get_user_chats(
         self,
         user_id: str,
+        db: AsyncSession,
         limit: int = 50,
         offset: int = 0,
-        db: AsyncSession,
     ) -> List[Dict[str, Any]]:
         """Get chat history for a user."""
         try:
